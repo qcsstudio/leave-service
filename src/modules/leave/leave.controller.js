@@ -46,10 +46,11 @@ exports.applyLeave = async (req, res) => {
   }
 };
 
+
 exports.takeAction = async (req, res) => {
   try {
     const { leaveId } = req.params;
-    const { action, remark } = req.body; // APPROVED / REJECTED
+    const { action } = req.body; // ONLY action now
 
     if (!["APPROVED", "REJECTED"].includes(action)) {
       return res.status(400).json({ message: "Invalid action" });
@@ -66,52 +67,35 @@ exports.takeAction = async (req, res) => {
 
     const role = req.user.role;
 
-    // 🔹 TL action (only if leave was applied by EMPLOYEE)
+    // 🔹 TL action
     if (role === "TL") {
-
       if (leave.approvals.tl.status !== "PENDING") {
         return res.status(400).json({ message: "Already acted by TL" });
       }
 
       leave.approvals.tl.status = action;
-      leave.approvals.tl.actionBy = req.user.id;
+      leave.approvals.tl.actionBy = req.user.id; // Who approved
       leave.approvals.tl.actionDate = new Date();
-      leave.approvals.tl.remark = remark;
+      leave.approvals.tl.remark = action === "APPROVED" ? "Approved by TL" : "Rejected by TL";
 
-      if (action === "REJECTED") {
-        leave.status = "REJECTED";
-      }
+      if (action === "REJECTED") leave.status = "REJECTED";
     }
 
     // 🔹 HR action
     else if (role === "HR") {
-
       if (leave.approvals.hr.status !== "PENDING") {
         return res.status(400).json({ message: "Already acted by HR" });
       }
 
       leave.approvals.hr.status = action;
-      leave.approvals.hr.actionBy = req.user.id;
+      leave.approvals.hr.actionBy = req.user.id; // Who approved
       leave.approvals.hr.actionDate = new Date();
-      leave.approvals.hr.remark = remark;
+      leave.approvals.hr.remark = action === "APPROVED" ? "Approved by HR" : "Rejected by HR";
 
-      if (action === "REJECTED") {
-        leave.status = "REJECTED";
-      }
+      if (action === "REJECTED") leave.status = "REJECTED";
 
-      // Final approval
-      if (
-        leave.approvals.tl.status === "APPROVED" &&
-        action === "APPROVED"
-      ) {
-        leave.status = "APPROVED";
-      }
-
-      // If TL leave (auto approved tl)
-      if (
-        leave.approvals.tl.status === "APPROVED" &&
-        leave.approvals.hr.status === "APPROVED"
-      ) {
+      // ✅ Final approval
+      if (leave.approvals.tl.status === "APPROVED" && leave.approvals.hr.status === "APPROVED") {
         leave.status = "APPROVED";
       }
     }
@@ -123,7 +107,7 @@ exports.takeAction = async (req, res) => {
     await leave.save();
 
     res.json({
-      message: "Action completed",
+      message: `Leave ${action} successfully`,
       leave
     });
 
