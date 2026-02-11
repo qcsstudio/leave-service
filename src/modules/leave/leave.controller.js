@@ -20,7 +20,7 @@ exports.applyLeave = async (req, res) => {
     // If TL applies
     if (role === "TL") {
       approvals = {
-        tl: { status: "APPROVED" }, // self approved
+        tl: { status: "APPROVED" },
         hr: { status: "PENDING" }
       };
     }
