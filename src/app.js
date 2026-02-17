@@ -8,6 +8,7 @@ app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
 app.use("/leave", require("./modules/leave/leave.routes"));
+app.use("/attendance", require("./modules/attendance/attendance.routes"));
 
 app.get("/", (req, res) => {
   res.json({ status: "Attendance Service Running 🚀" });
