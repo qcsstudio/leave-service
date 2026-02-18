@@ -2,20 +2,25 @@ const Attendance = require("./attendance.model");
 const Punch = require("./punch.model");
 const mongoose = require("mongoose");
 
+// ===== Date Helpers =====
 const startOfDay = (d = new Date()) => {
-    const date = new Date(d);
-    date.setHours(0, 0, 0, 0);
-    return date;
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  return date;
 };
 
 const startOfMonth = (y, m) => new Date(y, m, 1);
 const endOfMonth = (y, m) => new Date(y, m + 1, 0, 23, 59, 59);
 
+// Calculate worked minutes
 const diffMinutes = (a, b) => Math.floor((b - a) / 60000);
 
-exports.punchIn = async ({ companyId, employeeId }) => {
-  const today = startOfDay();
+// ===== PUNCH IN =====
+exports.punchIn = async ({ companyId, employeeId, time }) => {
+  const punchTime = time ? new Date(time) : new Date();
+  const today = startOfDay(punchTime);
 
+  // Check for existing open punch
   const openPunch = await Punch.findOne({
     companyId,
     employeeId,
@@ -24,33 +29,36 @@ exports.punchIn = async ({ companyId, employeeId }) => {
 
   if (openPunch) throw new Error("Already punched in");
 
+  // Upsert attendance
   const attendance = await Attendance.findOneAndUpdate(
     { companyId, employeeId, date: today },
-    {
-      $setOnInsert: {
-        companyId,
-        employeeId,
-        date: today
-      }
-    },
-    { upsert: true, new: true }
+    { $setOnInsert: { companyId, employeeId, date: today } },
+    { upsert: true, returnDocument: "after" } // fixed mongoose warning
   );
 
+  // Create punch
   const punch = await Punch.create({
     companyId,
     employeeId,
     attendanceId: attendance._id,
-    punchIn: new Date()
+    punchIn: punchTime
   });
 
   await Attendance.findByIdAndUpdate(attendance._id, {
     $set: { firstPunchIn: punch.punchIn }
   });
 
-  return punch;
+  return {
+    punch,
+    attendance
+  };
 };
 
-exports.punchOut = async ({ companyId, employeeId }) => {
+// ===== PUNCH OUT =====
+exports.punchOut = async ({ companyId, employeeId, time }) => {
+  const punchTime = time ? new Date(time) : new Date();
+
+  // Find open punch
   const punch = await Punch.findOne({
     companyId,
     employeeId,
@@ -59,9 +67,10 @@ exports.punchOut = async ({ companyId, employeeId }) => {
 
   if (!punch) throw new Error("No active punch");
 
-  punch.punchOut = new Date();
+  punch.punchOut = punchTime;
   await punch.save();
 
+  // Calculate worked minutes
   const minutes = diffMinutes(punch.punchIn, punch.punchOut);
 
   await Attendance.findByIdAndUpdate(punch.attendanceId, {
@@ -69,9 +78,13 @@ exports.punchOut = async ({ companyId, employeeId }) => {
     $set: { lastPunchOut: punch.punchOut }
   });
 
-  return punch;
+  return {
+    punch,
+    workedMinutes: minutes
+  };
 };
 
+// ===== GET TODAY STATUS =====
 exports.getTodayStatus = async ({ companyId, employeeId }) => {
   const today = startOfDay();
 
@@ -79,7 +92,7 @@ exports.getTodayStatus = async ({ companyId, employeeId }) => {
     companyId,
     employeeId,
     date: today
-  });
+  }).lean();
 
   const openPunch = await Punch.findOne({
     companyId,
@@ -94,14 +107,8 @@ exports.getTodayStatus = async ({ companyId, employeeId }) => {
   };
 };
 
-
-
-exports.getMonthlyCalendar = async ({
-  companyId,
-  employeeId,
-  month,
-  year
-}) => {
+// ===== GET MONTHLY CALENDAR =====
+exports.getMonthlyCalendar = async ({ companyId, employeeId, month, year }) => {
   const m = month - 1;
   const start = startOfMonth(year, m);
   const end = endOfMonth(year, m);
@@ -131,4 +138,19 @@ exports.getMonthlyCalendar = async ({
   }
 
   return calendar;
+};
+
+// ===== BIOMETRIC / MANUAL PUNCH =====
+exports.biometricPunch = async ({ companyId, employeeId, time }) => {
+  const openPunch = await Punch.findOne({
+    companyId,
+    employeeId,
+    punchOut: null
+  });
+
+  if (!openPunch) {
+    return exports.punchIn({ companyId, employeeId, time });
+  } else {
+    return exports.punchOut({ companyId, employeeId, time });
+  }
 };
