@@ -11,5 +11,6 @@ router.get("/my-leaves", auth, controller.myLeaves);
 
 router.get("/pending", auth, controller.pendingLeaves);
 
+router.get("/dashboard", auth, controller.employeeDashboard);
 
 module.exports = router;
