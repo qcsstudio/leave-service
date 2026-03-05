@@ -13,4 +13,6 @@ router.get("/pending", auth, controller.pendingLeaves);
 
 router.get("/dashboard", auth, controller.employeeDashboard);
 
+router.get("/hr-dashboard", auth, controller.hrDashboard);
+
 module.exports = router;

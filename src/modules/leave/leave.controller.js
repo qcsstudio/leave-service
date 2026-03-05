@@ -182,3 +182,18 @@ exports.employeeDashboard = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+
+exports.hrDashboard = async (req, res) => {
+  try {
+    const data = await leaveService.getHRDashboard({
+      companyId: req.user.companyId,
+      userId: req.user.id,
+      role: req.user.role
+    });
+
+    res.json(data);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
