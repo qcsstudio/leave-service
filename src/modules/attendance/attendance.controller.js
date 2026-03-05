@@ -50,3 +50,16 @@ exports.monthCalendar = async (req, res) => {
   res.json(data);
 };
 
+exports.dashboardStats = async (req, res) => {
+  try {
+    const data = await service.getDashboardStats({
+      companyId: req.user.companyId,
+      userId: req.user.id,
+      role: req.user.role
+    });
+    res.json(data);
+  } catch (e) {
+    res.status(400).json({ message: e.message });
+  }
+};
+

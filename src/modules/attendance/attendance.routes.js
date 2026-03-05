@@ -9,5 +9,6 @@ router.post("/punch-out", auth, controller.punchOut);
 router.get("/today", auth, controller.todayStatus);
 
 router.get("/calendar", auth, controller.monthCalendar);
+router.get("/dashboard", auth, controller.dashboardStats);
 
 module.exports = router;

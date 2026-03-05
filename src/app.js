@@ -24,6 +24,7 @@ app.use("/uploads", express.static("uploads"));
 
 app.use("/leave", require("./modules/leave/leave.routes"));
 app.use("/attendance", require("./modules/attendance/attendance.routes"));
+app.use("/break", require("./modules/break/break.routes"));
 app.use("/biometric", require("./modules/biometric/device.routes"));
 
 app.get("/", (req, res) => {
