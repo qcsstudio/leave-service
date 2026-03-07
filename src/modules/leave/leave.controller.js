@@ -1,4 +1,5 @@
 const Leave = require("./leave.model");
+const leaveService = require("./leave.service");
 
 
 exports.applyLeave = async (req, res) => {
@@ -161,5 +162,38 @@ exports.pendingLeaves = async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+
+exports.employeeDashboard = async (req, res) => {
+  try {
+    const { month, year } = req.query;
+
+    const data = await leaveService.getEmployeeDashboard({
+      companyId: req.user.companyId,
+      employeeId: req.user.id,
+      month: month ? Number(month) : undefined,
+      year: year ? Number(year) : undefined
+    });
+
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+exports.hrDashboard = async (req, res) => {
+  try {
+    const data = await leaveService.getHRDashboard({
+      companyId: req.user.companyId,
+      userId: req.user.id,
+      role: req.user.role
+    });
+
+    res.json(data);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
   }
 };
