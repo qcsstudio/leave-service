@@ -26,6 +26,8 @@ app.use("/leave", require("./modules/leave/leave.routes"));
 app.use("/holiday", require("./modules/holiday/holiday.routes"));
 app.use("/attendance", require("./modules/attendance/attendance.routes"));
 app.use("/biometric", require("./modules/biometric/device.routes"));
+app.use("/regularization", require("./modules/regularization/regularization.routes"));
+app.use("/dashboard", require("./modules/dashboard/dashboard.routes"));
 
 app.get("/", (req, res) => {
   res.json({ status: "Attendance Service Running 🚀" });
