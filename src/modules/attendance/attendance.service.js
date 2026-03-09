@@ -154,3 +154,176 @@ exports.biometricPunch = async ({ companyId, employeeId, time }) => {
     return exports.punchOut({ companyId, employeeId, time });
   }
 };
+
+// ===== DASHBOARD STATS (HR / TL) =====
+exports.getDashboardStats = async ({ companyId, userId, role }) => {
+  if (!["HR", "TL"].includes(role)) {
+    throw new Error("Unauthorized access");
+  }
+
+  const companyObjectId = new mongoose.Types.ObjectId(companyId);
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  /* --- Scope: HR sees all, TL sees only their team --- */
+  let employeeMatch = { companyId: companyObjectId };
+
+  if (role === "TL") {
+    const team = await mongoose.connection
+      .collection("teams")
+      .findOne({ teamLeadId: userObjectId });
+
+    const teamEmployeeIds =
+      team?.assignedEmployeeList?.map(
+        (emp) => new mongoose.Types.ObjectId(emp.employeeId)
+      ) || [];
+
+    employeeMatch._id = { $in: teamEmployeeIds };
+  }
+
+  /* --- Aggregation --- */
+  const result = await mongoose.connection
+    .collection("employees")
+    .aggregate([
+      { $match: employeeMatch },
+      {
+        $facet: {
+          /* TOTAL EMPLOYEES */
+          totalEmployees: [{ $count: "count" }],
+
+          /* STATUS COUNTS */
+          presentCount: [
+            {
+              $lookup: {
+                from: "attendances",
+                let: { empId: "$_id" },
+                pipeline: [
+                  {
+                    $match: {
+                      companyId: companyObjectId,
+                      date: { $gte: todayStart, $lte: todayEnd },
+                      status: "PRESENT",
+                      $expr: { $eq: ["$employeeId", "$$empId"] }
+                    }
+                  }
+                ],
+                as: "att"
+              }
+            },
+            { $match: { att: { $ne: [] } } },
+            { $count: "count" }
+          ],
+
+          absentCount: [
+            {
+              $lookup: {
+                from: "attendances",
+                let: { empId: "$_id" },
+                pipeline: [
+                  {
+                    $match: {
+                      companyId: companyObjectId,
+                      date: { $gte: todayStart, $lte: todayEnd },
+                      status: "ABSENT",
+                      $expr: { $eq: ["$employeeId", "$$empId"] }
+                    }
+                  }
+                ],
+                as: "att"
+              }
+            },
+            { $match: { att: { $ne: [] } } },
+            { $count: "count" }
+          ],
+
+          lateCount: [
+            {
+              $lookup: {
+                from: "attendances",
+                let: { empId: "$_id" },
+                pipeline: [
+                  {
+                    $match: {
+                      companyId: companyObjectId,
+                      date: { $gte: todayStart, $lte: todayEnd },
+                      status: "LATE",
+                      $expr: { $eq: ["$employeeId", "$$empId"] }
+                    }
+                  }
+                ],
+                as: "att"
+              }
+            },
+            { $match: { att: { $ne: [] } } },
+            { $count: "count" }
+          ],
+
+          onLeaveCount: [
+            {
+              $lookup: {
+                from: "attendances",
+                let: { empId: "$_id" },
+                pipeline: [
+                  {
+                    $match: {
+                      companyId: companyObjectId,
+                      date: { $gte: todayStart, $lte: todayEnd },
+                      status: "LEAVE",
+                      $expr: { $eq: ["$employeeId", "$$empId"] }
+                    }
+                  }
+                ],
+                as: "att"
+              }
+            },
+            { $match: { att: { $ne: [] } } },
+            { $count: "count" }
+          ]
+        }
+      },
+      {
+        $project: {
+          totalEmployees: {
+            $ifNull: [{ $arrayElemAt: ["$totalEmployees.count", 0] }, 0]
+          },
+          present: {
+            $ifNull: [{ $arrayElemAt: ["$presentCount.count", 0] }, 0]
+          },
+          absent: {
+            $ifNull: [{ $arrayElemAt: ["$absentCount.count", 0] }, 0]
+          },
+          late: {
+            $ifNull: [{ $arrayElemAt: ["$lateCount.count", 0] }, 0]
+          },
+          onLeave: {
+            $ifNull: [{ $arrayElemAt: ["$onLeaveCount.count", 0] }, 0]
+          }
+        }
+      },
+      {
+        $addFields: {
+          notMarked: {
+            $subtract: [
+              "$totalEmployees",
+              { $add: ["$present", "$absent", "$late", "$onLeave"] }
+            ]
+          }
+        }
+      }
+    ])
+    .toArray();
+
+  return result[0] || {
+    totalEmployees: 0,
+    present: 0,
+    absent: 0,
+    late: 0,
+    onLeave: 0,
+    notMarked: 0
+  };
+};
