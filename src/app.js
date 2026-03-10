@@ -6,23 +6,21 @@ const app = express();
 // ✅ Allowed origins
 const allowedOrigins = [
   "https://qcsstudios.com",
-  "https://www.qcsstudios.com"
+  "https://www.qcsstudios.com",
+  "http://localhost:5173" // <- for local frontend development
 ];
 
 // ✅ CORS middleware
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (Postman, curl)
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // Postman/curl
 
-    // Allow main domain and subdomains
     if (allowedOrigins.includes(origin) || origin.endsWith(".qcsstudios.com")) {
       return callback(null, true);
     }
 
-    // Block other origins (DO NOT throw an error)
     console.log("Blocked CORS for origin:", origin);
-    return callback(null, false); // <- change is here
+    return callback(null, false);
   },
   credentials: true,
   optionsSuccessStatus: 204
