@@ -2,17 +2,19 @@ const service = require("./holiday.service");
 
 exports.addHoliday = async (req, res) => {
   try {
+    // Only HR can add
     if (!["HR"].includes(req.user.role)) {
       return res.status(403).json({ message: "Only HR can add holidays" });
     }
 
     const { name, date, type, description } = req.body;
 
+    // Required fields check
     if (!name || !date) {
       return res.status(400).json({ message: "Name and date are required" });
     }
 
-    const data = await service.addHoliday({
+    const holiday = await service.addHoliday({
       companyId: req.user.companyId,
       name,
       date,
@@ -21,7 +23,19 @@ exports.addHoliday = async (req, res) => {
       createdBy: req.user.id
     });
 
-    res.status(201).json({ message: "Holiday added", data });
+    // ✅ Return holiday object at top level
+    res.status(201).json({
+      message: "Holiday added",
+      _id: holiday._id,
+      companyId: holiday.companyId,
+      name: holiday.name,
+      date: holiday.date,
+      type: holiday.type,
+      description: holiday.description,
+      createdBy: holiday.createdBy,
+      createdAt: holiday.createdAt,
+      updatedAt: holiday.updatedAt
+    });
   } catch (e) {
     res.status(400).json({ message: e.message });
   }
