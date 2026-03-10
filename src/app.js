@@ -3,30 +3,32 @@ const cors = require("cors");
 
 const app = express();
 
-// ✅ Proper CORS setup (handles preflight OPTIONS automatically)
+// ✅ Allowed origins
 const allowedOrigins = [
   "https://qcsstudios.com",
   "https://www.qcsstudios.com"
 ];
 
+// ✅ CORS middleware
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow non-browser requests (Postman, curl)
+    // Allow requests with no origin (Postman, curl)
     if (!origin) return callback(null, true);
 
-    // Allow all subdomains of qcsstudios.com
+    // Allow main domain and subdomains
     if (allowedOrigins.includes(origin) || origin.endsWith(".qcsstudios.com")) {
       return callback(null, true);
     }
 
-    console.log("Blocked CORS for origin:", origin); // ✅ optional debug
-    return callback(new Error("Not allowed by CORS"));
+    // Block other origins (DO NOT throw an error)
+    console.log("Blocked CORS for origin:", origin);
+    return callback(null, false); // <- change is here
   },
-  credentials: true, // allows cookies / auth headers
-  optionsSuccessStatus: 204 // ensures OPTIONS preflight returns 204
+  credentials: true,
+  optionsSuccessStatus: 204
 }));
 
-// ✅ Bypass auth for OPTIONS requests globally
+// ✅ Global OPTIONS handler
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
