@@ -3,10 +3,10 @@ const cors = require("cors");
 
 const app = express();
 
-// ✅ Proper CORS setup
+// ✅ Proper CORS setup (handles preflight OPTIONS automatically)
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow non-browser requests (like Postman)
+    // Allow non-browser requests (Postman, curl)
     if (!origin) return callback(null, true);
 
     // Allow frontend domains
