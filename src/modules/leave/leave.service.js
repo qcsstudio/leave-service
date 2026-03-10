@@ -10,9 +10,40 @@ const calcDays = (from, to) => {
 };
 
 // ===== EMPLOYEE DASHBOARD =====
-exports.getEmployeeDashboard = async ({ companyId, employeeId, month, year }) => {
+exports.getEmployeeDashboard = async ({
+  companyId,
+  employeeId,
+  month,
+  year,
+  date,
+  startDate,
+  endDate
+}) => {
   const currentYear = year || new Date().getFullYear();
   const currentMonth = month || (new Date().getMonth() + 1);
+
+  let filterStart;
+  let filterEnd;
+
+  if (date) {
+    filterStart = new Date(date);
+    filterStart.setHours(0, 0, 0, 0);
+
+    filterEnd = new Date(date);
+    filterEnd.setHours(23, 59, 59, 999);
+  } else if (startDate && endDate) {
+    filterStart = new Date(startDate);
+    filterStart.setHours(0, 0, 0, 0);
+
+    filterEnd = new Date(endDate);
+    filterEnd.setHours(23, 59, 59, 999);
+  } else if (month) {
+    filterStart = new Date(currentYear, currentMonth - 1, 1);
+    filterEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999);
+  } else {
+    filterStart = new Date(currentYear, 0, 1);
+    filterEnd = new Date(currentYear, 11, 31, 23, 59, 59, 999);
+  }
 
   // 1. Leave Balance
   let balance = await LeaveBalance.findOne({
@@ -42,7 +73,9 @@ exports.getEmployeeDashboard = async ({ companyId, employeeId, month, year }) =>
   // 2. Recent Leave Requests (last 5, any status)
   const recentRequests = await Leave.find({
     companyId,
-    employeeId
+    employeeId,
+    fromDate: { $lte: filterEnd },
+    toDate: { $gte: filterStart }
   })
     .sort({ createdAt: -1 })
     .limit(5)
@@ -58,15 +91,13 @@ exports.getEmployeeDashboard = async ({ companyId, employeeId, month, year }) =>
     status: l.status
   }));
 
-  // 3. Leave History (filtered by month/year)
-  const monthStart = new Date(currentYear, currentMonth - 1, 1);
-  const monthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999);
+  // 3. Leave History (filtered by date/date-range/month/year)
 
   const history = await Leave.find({
     companyId,
     employeeId,
-    fromDate: { $lte: monthEnd },
-    toDate: { $gte: monthStart }
+    fromDate: { $lte: filterEnd },
+    toDate: { $gte: filterStart }
   })
     .sort({ fromDate: -1 })
     .lean();
@@ -90,7 +121,15 @@ exports.getEmployeeDashboard = async ({ companyId, employeeId, month, year }) =>
 };
 
 // ===== HR / TL LEAVE DASHBOARD =====
-exports.getHRDashboard = async ({ companyId, userId, role }) => {
+exports.getHRDashboard = async ({
+  companyId,
+  userId,
+  role,
+  months,
+  date,
+  startDate,
+  endDate
+}) => {
   if (!["HR", "TL"].includes(role)) {
     throw new Error("Unauthorized access");
   }
@@ -98,16 +137,41 @@ exports.getHRDashboard = async ({ companyId, userId, role }) => {
   const companyObjectId = new mongoose.Types.ObjectId(companyId);
   const userObjectId = new mongoose.Types.ObjectId(userId);
 
-  const todayStart = new Date();
+  const today = new Date();
+  const todayStart = new Date(today);
   todayStart.setHours(0, 0, 0, 0);
-
-  const todayEnd = new Date();
+  const todayEnd = new Date(today);
   todayEnd.setHours(23, 59, 59, 999);
+
+  const currentYear = new Date().getFullYear();
+
+  let filterStart;
+  let filterEnd;
+
+  if (date) {
+    filterStart = new Date(date);
+    filterStart.setHours(0, 0, 0, 0);
+
+    filterEnd = new Date(date);
+    filterEnd.setHours(23, 59, 59, 999);
+  } else if (startDate && endDate) {
+    filterStart = new Date(startDate);
+    filterStart.setHours(0, 0, 0, 0);
+
+    filterEnd = new Date(endDate);
+    filterEnd.setHours(23, 59, 59, 999);
+  } else if (months) {
+    filterEnd = new Date(todayEnd);
+    filterStart = new Date(todayStart);
+    filterStart.setMonth(filterStart.getMonth() - months);
+  } else {
+    filterStart = new Date(todayStart);
+    filterEnd = new Date(todayEnd);
+  }
 
   const next7Days = new Date(todayStart);
   next7Days.setDate(next7Days.getDate() + 7);
-
-  const currentYear = new Date().getFullYear();
+  next7Days.setHours(23, 59, 59, 999);
 
   /* --- Scope: HR sees all, TL sees their team --- */
   let employeeIds = null;
@@ -135,11 +199,11 @@ exports.getHRDashboard = async ({ companyId, userId, role }) => {
   const onLeaveToday = await Leave.countDocuments({
     ...baseLeaveFilter,
     status: "APPROVED",
-    fromDate: { $lte: todayEnd },
-    toDate: { $gte: todayStart }
+    fromDate: { $lte: filterEnd },
+    toDate: { $gte: filterStart }
   });
 
-  // Upcoming 7 Days
+  // Upcoming 7 Days (always from today, unchanged)
   const upcoming7Days = await Leave.countDocuments({
     ...baseLeaveFilter,
     status: "APPROVED",
@@ -149,7 +213,9 @@ exports.getHRDashboard = async ({ companyId, userId, role }) => {
   // Pending Approvals
   let pendingFilter = {
     ...baseLeaveFilter,
-    status: "PENDING"
+    status: "PENDING",
+    fromDate: { $lte: filterEnd },
+    toDate: { $gte: filterStart }
   };
   if (role === "TL") {
     pendingFilter["approvals.tl.status"] = "PENDING";
@@ -162,6 +228,8 @@ exports.getHRDashboard = async ({ companyId, userId, role }) => {
   const approvedLeaves = await Leave.find({
     ...baseLeaveFilter,
     status: "APPROVED",
+    fromDate: { $lte: filterEnd },
+    toDate: { $gte: filterStart },
     "approvals.hr.actionDate": { $exists: true }
   })
     .select("createdAt approvals.hr.actionDate")

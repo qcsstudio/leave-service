@@ -168,13 +168,63 @@ exports.pendingLeaves = async (req, res) => {
 
 exports.employeeDashboard = async (req, res) => {
   try {
-    const { month, year } = req.query;
+    const {
+      month,
+      year,
+      date,
+      startDate,
+      endDate,
+      fromDate,
+      toDate
+    } = req.query;
+
+    const rangeStartRaw = startDate || fromDate;
+    const rangeEndRaw = endDate || toDate;
+
+    if (date && (rangeStartRaw || rangeEndRaw)) {
+      return res.status(400).json({
+        message: "Provide either 'date' or date range ('startDate'/'endDate')."
+      });
+    }
+
+    if ((rangeStartRaw && !rangeEndRaw) || (!rangeStartRaw && rangeEndRaw)) {
+      return res.status(400).json({
+        message: "Both 'startDate' and 'endDate' are required for date range filter."
+      });
+    }
+
+    if (month && (Number(month) < 1 || Number(month) > 12)) {
+      return res.status(400).json({ message: "Month must be between 1 and 12." });
+    }
+
+    const parsedDate = date ? new Date(date) : undefined;
+    if (date && Number.isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ message: "Invalid 'date'." });
+    }
+
+    const parsedStartDate = rangeStartRaw ? new Date(rangeStartRaw) : undefined;
+    const parsedEndDate = rangeEndRaw ? new Date(rangeEndRaw) : undefined;
+
+    if (rangeStartRaw && Number.isNaN(parsedStartDate.getTime())) {
+      return res.status(400).json({ message: "Invalid 'startDate'." });
+    }
+
+    if (rangeEndRaw && Number.isNaN(parsedEndDate.getTime())) {
+      return res.status(400).json({ message: "Invalid 'endDate'." });
+    }
+
+    if (parsedStartDate && parsedEndDate && parsedStartDate > parsedEndDate) {
+      return res.status(400).json({ message: "'startDate' cannot be after 'endDate'." });
+    }
 
     const data = await leaveService.getEmployeeDashboard({
       companyId: req.user.companyId,
       employeeId: req.user.id,
       month: month ? Number(month) : undefined,
-      year: year ? Number(year) : undefined
+      year: year ? Number(year) : undefined,
+      date: parsedDate,
+      startDate: parsedStartDate,
+      endDate: parsedEndDate
     });
 
     res.json(data);
@@ -186,10 +236,63 @@ exports.employeeDashboard = async (req, res) => {
 
 exports.hrDashboard = async (req, res) => {
   try {
+    const {
+      months,
+      date,
+      startDate,
+      endDate,
+      fromDate,
+      toDate
+    } = req.query;
+
+    const rangeStartRaw = startDate || fromDate;
+    const rangeEndRaw = endDate || toDate;
+
+    const filtersProvided = [date, rangeStartRaw, months].filter(Boolean).length;
+    if (filtersProvided > 1) {
+      return res.status(400).json({
+        message: "Provide only one: 'date', date range ('startDate'/'endDate'), or 'months'."
+      });
+    }
+
+    if ((rangeStartRaw && !rangeEndRaw) || (!rangeStartRaw && rangeEndRaw)) {
+      return res.status(400).json({
+        message: "Both 'startDate' and 'endDate' are required for date range filter."
+      });
+    }
+
+    if (months && (Number(months) < 1 || Number(months) > 120)) {
+      return res.status(400).json({ message: "'months' must be between 1 and 120." });
+    }
+
+    const parsedDate = date ? new Date(date) : undefined;
+    if (date && Number.isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ message: "Invalid 'date'." });
+    }
+
+    const parsedStartDate = rangeStartRaw ? new Date(rangeStartRaw) : undefined;
+    const parsedEndDate = rangeEndRaw ? new Date(rangeEndRaw) : undefined;
+
+    if (rangeStartRaw && Number.isNaN(parsedStartDate.getTime())) {
+      return res.status(400).json({ message: "Invalid 'startDate'." });
+    }
+
+    if (rangeEndRaw && Number.isNaN(parsedEndDate.getTime())) {
+      return res.status(400).json({ message: "Invalid 'endDate'." });
+    }
+
+    if (parsedStartDate && parsedEndDate && parsedStartDate > parsedEndDate) {
+      return res.status(400).json({ message: "'startDate' cannot be after 'endDate'." });
+    }
+
     const data = await leaveService.getHRDashboard({
       companyId: req.user.companyId,
       userId: req.user.id,
-      role: req.user.role
+      role: req.user.role,
+      months: months ? Number(months) : undefined,
+      date: parsedDate,
+      startDate: parsedStartDate,
+      endDate: parsedEndDate
     });
 
     res.json(data);
