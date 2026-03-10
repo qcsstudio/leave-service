@@ -4,22 +4,35 @@ const cors = require("cors");
 const app = express();
 
 // ✅ Proper CORS setup (handles preflight OPTIONS automatically)
+const allowedOrigins = [
+  "https://qcsstudios.com",
+  "https://www.qcsstudios.com"
+];
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow non-browser requests (Postman, curl)
     if (!origin) return callback(null, true);
 
-    // Allow frontend domains
-    if (origin.endsWith(".qcsstudios.com") || origin === "https://qcsstudios.com") {
+    // Allow all subdomains of qcsstudios.com
+    if (allowedOrigins.includes(origin) || origin.endsWith(".qcsstudios.com")) {
       return callback(null, true);
     }
 
-    // Block other domains
+    console.log("Blocked CORS for origin:", origin); // ✅ optional debug
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true, // allows cookies / auth headers
   optionsSuccessStatus: 204 // ensures OPTIONS preflight returns 204
 }));
+
+// ✅ Bypass auth for OPTIONS requests globally
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
