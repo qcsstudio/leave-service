@@ -1,27 +1,41 @@
 const service = require("./device.service");
 
-exports.addDevice = async (req,res)=>{
-  try{
+// Map frontend deviceType → backend enum
+const typeMap = {
+  Biometric_Scanner: "FINGERPRINT",
+  Facial_Recognition: "FACE",
+  RFID_Card_Reader: "RFID",
+  Smart_Lock: "LOCK" // optional if you want to support Smart Lock later
+};
 
-    if(!req.body.name || !req.body.deviceType){
-      return res.status(400).json({message:"Missing fields"});
+exports.addDevice = async (req,res) => {
+  try {
+
+    if (!req.body.name || !req.body.deviceType) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    // Map frontend type to backend enum
+    const deviceType = typeMap[req.body.deviceType];
+    if (!deviceType) {
+      return res.status(400).json({ message: "Invalid deviceType" });
     }
 
     const device = await service.createDevice({
       ...req.body,
-      companyId:req.user.companyId
+      deviceType,             // use mapped type
+      companyId: req.user.companyId
     });
 
     res.json({
-      message:"Device registered",
+      message: "Device registered",
       device
     });
 
-  }catch(e){
-    res.status(400).json({message:e.message});
+  } catch (e) {
+    res.status(400).json({ message: e.message });
   }
 };
-
 
 
 exports.listDevices = async (req,res)=>{

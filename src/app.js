@@ -44,7 +44,7 @@ app.use("/attendance", require("./modules/attendance/attendance.routes"));
 app.use("/break", require("./modules/break/break.routes"));
 app.use("/biometric", require("./modules/biometric/device.routes"));
 app.use("/regularization", require("./modules/regularization/regularization.routes"));
-app.use("/dashboard", require("./modules/dashboard/dashboard.routes"));
+app.use("/dashboard", require("./modules/dashboard/dashboard.routes"));yogesh
 
 // Health check
 app.get("/", (req, res) => {
