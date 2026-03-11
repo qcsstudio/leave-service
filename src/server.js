@@ -1,6 +1,9 @@
 require("dotenv").config();
+
 const app = require("./app");
 const connectDB = require("./config/db");
+
+require("../src/modules/workers/holiday.worker");
 
 const PORT = process.env.PORT || 5003;
 

@@ -23,3 +23,20 @@ exports.findByBiometricCode = async (
     return null;
   }
 };
+
+
+
+exports.getEmployeesByCompany = async (companyId) => {
+  try {
+
+    const res = await axios.get(
+      `${BASE}/employees/internal/company/${companyId}`
+    );
+
+    return res.data;
+
+  } catch (err) {
+    console.error("Employee service error:", err.message);
+    return [];
+  }
+};

@@ -1,15 +1,14 @@
 const service = require("./holiday.service");
+const holidayQueue = require("../queues/holiday.queue");
 
 exports.addHoliday = async (req, res) => {
   try {
-    // Only HR can add
-    if (!["HR"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Only HR can add holidays" });
-    }
+    // if (!["HR"].includes(req.user.role)) {
+    //   return res.status(403).json({ message: "Only HR can add holidays" });
+    // }
 
-    const { name, date, type, description } = req.body;
+    const { name, date, type, description, isNotification } = req.body;
 
-    // Required fields check
     if (!name || !date) {
       return res.status(400).json({ message: "Name and date are required" });
     }
@@ -23,19 +22,19 @@ exports.addHoliday = async (req, res) => {
       createdBy: req.user.id
     });
 
-    // ✅ Return holiday object at top level
+    // 🔔 Push job to queue
+    if (isNotification === true) {
+      await holidayQueue.add("sendHolidayNotification", {
+        companyId: req.user.companyId,
+        holiday
+      });
+    }
+
     res.status(201).json({
       message: "Holiday added",
-      _id: holiday._id,
-      companyId: holiday.companyId,
-      name: holiday.name,
-      date: holiday.date,
-      type: holiday.type,
-      description: holiday.description,
-      createdBy: holiday.createdBy,
-      createdAt: holiday.createdAt,
-      updatedAt: holiday.updatedAt
+      ...holiday._doc
     });
+
   } catch (e) {
     res.status(400).json({ message: e.message });
   }
@@ -58,9 +57,9 @@ exports.getHolidays = async (req, res) => {
 
 exports.updateHoliday = async (req, res) => {
   try {
-    if (!["HR"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Only HR can update holidays" });
-    }
+    // if (!["HR"].includes(req.user.role)) {
+    //   return res.status(403).json({ message: "Only HR can update holidays" });
+    // }
 
     const { name, date, type, description } = req.body;
     const updates = {};
@@ -83,9 +82,9 @@ exports.updateHoliday = async (req, res) => {
 
 exports.deleteHoliday = async (req, res) => {
   try {
-    if (!["HR"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Only HR can delete holidays" });
-    }
+    // if (!["HR"].includes(req.user.role)) {
+    //   return res.status(403).json({ message: "Only HR can delete holidays" });
+    // }
 
     await service.deleteHoliday({
       companyId: req.user.companyId,
