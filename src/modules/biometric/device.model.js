@@ -21,11 +21,11 @@ const deviceSchema = new mongoose.Schema({
     required: true
   },
 
-  connectionMode: {
-    type: String,
-    enum: ["LAN", "CLOUD", "WEBHOOK"],
-    required: true
-  },
+ connectionMode: {
+  type: String,
+  enum: ["LAN", "LAN/IP", "CLOUD", "WEBHOOK"],
+  required: true
+},
 
   ipAddress: String,
   port: Number,
