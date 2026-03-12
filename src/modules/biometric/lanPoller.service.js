@@ -21,29 +21,33 @@ exports.pollDevices = async () => {
     isActive: true
   });
 
-  for (const device of devices) {
+for (const device of devices) {
 
-    try {
+  console.log("📡 Polling device:", device.name, device.ipAddress);
 
-      const logs = await fetchLogsFromDevice(device);
+  try {
 
-      for (const log of logs) {
+    const logs = await fetchLogsFromDevice(device);
 
-        await processor.processEvent({
-          device,
-          employeeCode: log.employeeCode,
-          timestamp: log.timestamp,
-          rawPayload: log
-        });
+    for (const log of logs) {
 
-      }
+      console.log("📥 Log received:", log);
 
-    } catch (err) {
-      console.error(
-        "Polling failed for device",
-        device._id,
-        err.message
-      );
+      await processor.processEvent({
+        device,
+        employeeCode: log.employeeCode,
+        timestamp: log.timestamp,
+        rawPayload: log
+      });
+
     }
+
+  } catch (err) {
+    console.error(
+      "Polling failed for device",
+      device._id,
+      err.message
+    );
   }
+}
 };
