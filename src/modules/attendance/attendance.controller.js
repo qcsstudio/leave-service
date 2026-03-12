@@ -1,6 +1,7 @@
 const service = require("./attendance.service");
 
 exports.punchIn = async (req, res) => {
+
   try {
     const data = await service.punchIn({
       companyId: req.user.companyId,

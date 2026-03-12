@@ -29,7 +29,7 @@ exports.receiveEvent = async (req, res) => {
     // Process event (punch in/out)
     const punchResult = await attendanceService.biometricPunch({
       companyId: device.companyId,
-      employeeId: employee._id,  // use _id from found employee
+      employeeId: employee._id, 
       time: timestamp
     });
 

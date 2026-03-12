@@ -1,9 +1,6 @@
 const Device = require("./device.model");
 const processor = require("./event.processor");
 
-
-// ⭐ MOCK device log reader
-// Replace with SDK integration later
 async function fetchLogsFromDevice(device) {
 
   // Simulated response from device
