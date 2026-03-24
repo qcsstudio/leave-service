@@ -1,42 +1,67 @@
-// ===== event.controller.js =====
+const BiometricEvent = require("./biometricEvent.model");
 const deviceService = require("./device.service");
-const processor = require("./event.processor");
 const EmployeeClient = require("../../clients/employee.client");
 const attendanceService = require("../attendance/attendance.service");
 
 exports.receiveEvent = async (req, res) => {
   try {
-    const apiKey = req.headers["x-device-key"];
+    const apiKey = req.headers["x-device-key"]; // optional if device uses key
     const device = await deviceService.findByApiKey(apiKey);
 
-    if (!device)
+    if (!device) {
+      console.log("❌ Invalid device API key:", apiKey);
       return res.status(403).json({ message: "Invalid device" });
+    }
 
-    const { employeeCode, timestamp } = req.body;
+    // ADMS payload example: { deviceUserId: '123', timestamp: '2026-03-24T10:15:00' }
+    const { deviceUserId, timestamp, deviceId } = req.body;
 
-    if (!employeeCode || !timestamp)
+    if (!deviceUserId || !timestamp) {
       return res.status(400).json({ message: "Invalid payload" });
+    }
 
-    // Fetch employee first
+    // Check duplicates
+    const exists = await BiometricEvent.findOne({
+      deviceId: deviceId || device._id,
+      employeeCode: deviceUserId,
+      timestamp: new Date(timestamp)
+    });
+
+    if (exists) {
+      console.log("⚠️ Duplicate entry skipped for", deviceUserId);
+      return res.send("OK");
+    }
+
+    // Map employee
     const employee = await EmployeeClient.findByBiometricCode(
-      employeeCode,
+      deviceUserId,
       device.companyId
     );
 
-    if (!employee)
-      return res.status(404).json({ message: "Employee not found" });
+    if (!employee) {
+      console.log("❌ Employee not found for code", deviceUserId);
+      return res.status(404).send("Employee not found");
+    }
 
-    // Process event (punch in/out)
+    // Save attendance
     const punchResult = await attendanceService.biometricPunch({
       companyId: device.companyId,
-      employeeId: employee._id, 
+      employeeId: employee._id,
       time: timestamp
     });
 
-    const punchDoc = punchResult.punch; // unwrap punch doc
-    const workedMinutes = punchResult.workedMinutes || null;
+    const punchDoc = punchResult.punch;
 
-    // Respond with full details
+    // Save raw payload
+    await BiometricEvent.create({
+      deviceId: deviceId || device._id,
+      employeeCode: deviceUserId,
+      timestamp: new Date(timestamp),
+      rawPayload: req.body
+    });
+
+    console.log("✅ Attendance saved for:", deviceUserId);
+
     res.json({
       status: "accepted",
       employee: {
@@ -49,12 +74,12 @@ exports.receiveEvent = async (req, res) => {
         id: punchDoc._id,
         punchIn: punchDoc.punchIn,
         punchOut: punchDoc.punchOut || null,
-        workedMinutes
+        workedMinutes: punchResult.workedMinutes || null
       },
       time: timestamp
     });
-
-  } catch (e) {
-    res.status(500).json({ message: e.message });
+  } catch (err) {
+    console.error("❌ Error processing ADMS event:", err);
+    res.status(500).json({ message: err.message });
   }
 };

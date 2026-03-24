@@ -26,6 +26,7 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
+
 // ✅ Global OPTIONS handler
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
@@ -36,6 +37,8 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
+app.use(express.urlencoded({ extended: true }));
+
 
 // 🚀 Routes
 app.use("/leave", require("./modules/leave/leave.routes"));
