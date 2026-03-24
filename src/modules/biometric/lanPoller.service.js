@@ -3,23 +3,22 @@ const processor = require("./event.processor");
 const ZKLib = require("node-zklib");
 const BiometricEvent = require("./biometricEvent.model");
 
+const DEFAULT_PORT = 4370;
+
 async function fetchLogsFromDevice(device) {
+  let zk;
 
   try {
+    const port = DEFAULT_PORT; // 🔥 force 4370
 
- console.log("====================================");
+    console.log("====================================");
     console.log("📡 Trying to connect device");
     console.log("Device Name:", device.name);
     console.log("Device IP:", device.ipAddress);
-    console.log("Device Port:", device.port);
+    console.log("Device Port (forced):", port);
     console.log("====================================");
 
-    const zk = new ZKLib(
-      device.ipAddress,
-      device.port,
-      10000,
-      4000
-    );
+    zk = new ZKLib(device.ipAddress, port, 10000, 4000);
 
     await zk.createSocket();
 
@@ -27,25 +26,31 @@ async function fetchLogsFromDevice(device) {
 
     const logs = await zk.getAttendances();
 
-    console.log("📥 Raw logs:", logs.data.length);
+    const data = logs?.data || [];
 
-    await zk.disconnect();
+    console.log("📥 Raw logs:", data.length);
 
-    return logs.data.map(log => ({
+    return data.map(log => ({
       employeeCode: log.deviceUserId,
       timestamp: log.recordTime
     }));
 
   } catch (error) {
-
     console.error("❌ Device connection failed:", error.message);
-
     return [];
+  } finally {
+    if (zk) {
+      try {
+        await zk.disconnect();
+        console.log("🔌 Disconnected");
+      } catch (e) {
+        console.log("⚠️ Disconnect error ignored");
+      }
+    }
   }
 }
 
 exports.pollDevices = async () => {
-
   console.log("🚀 Poller started at:", new Date());
 
   const devices = await Device.find({
@@ -56,7 +61,6 @@ exports.pollDevices = async () => {
   console.log("📡 Total devices:", devices.length);
 
   for (const device of devices) {
-
     console.log("📡 Polling device:", device.name, device.ipAddress);
 
     try {
@@ -65,7 +69,6 @@ exports.pollDevices = async () => {
       console.log("📥 Logs fetched count:", logs.length);
 
       for (const log of logs) {
-
         console.log("👉 Processing log:", log);
 
         const exists = await BiometricEvent.findOne({
@@ -85,7 +88,6 @@ exports.pollDevices = async () => {
           timestamp: log.timestamp,
           rawPayload: log
         });
-
       }
 
     } catch (err) {
