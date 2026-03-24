@@ -7,7 +7,12 @@ async function fetchLogsFromDevice(device) {
 
   try {
 
-    console.log("📡 Connecting to device:", device.ipAddress);
+ console.log("====================================");
+    console.log("📡 Trying to connect device");
+    console.log("Device Name:", device.name);
+    console.log("Device IP:", device.ipAddress);
+    console.log("Device Port:", device.port);
+    console.log("====================================");
 
     const zk = new ZKLib(
       device.ipAddress,
@@ -39,26 +44,29 @@ async function fetchLogsFromDevice(device) {
   }
 }
 
-
-// MAIN POLLER
 exports.pollDevices = async () => {
+
+  console.log("🚀 Poller started at:", new Date());
 
   const devices = await Device.find({
     connectionMode: { $in: ["LAN", "LAN/IP"] },
     isActive: true
   });
 
+  console.log("📡 Total devices:", devices.length);
+
   for (const device of devices) {
 
     console.log("📡 Polling device:", device.name, device.ipAddress);
 
     try {
-
       const logs = await fetchLogsFromDevice(device);
+
+      console.log("📥 Logs fetched count:", logs.length);
 
       for (const log of logs) {
 
-        console.log("📥 Log received:", log);
+        console.log("👉 Processing log:", log);
 
         const exists = await BiometricEvent.findOne({
           deviceId: device._id,
@@ -67,7 +75,7 @@ exports.pollDevices = async () => {
         });
 
         if (exists) {
-          console.log("⚠️ Duplicate event skipped");
+          console.log("⚠️ Duplicate skipped:", log);
           continue;
         }
 
@@ -81,13 +89,7 @@ exports.pollDevices = async () => {
       }
 
     } catch (err) {
-
-      console.error(
-        "Polling failed for device",
-        device._id,
-        err.message
-      );
-
+      console.error("❌ Polling failed:", err.message);
     }
   }
 };

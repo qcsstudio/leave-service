@@ -16,3 +16,4 @@ router.delete("/device/:id", auth, deviceController.removeDevice);
 router.post("/event", eventController.receiveEvent);
 
 module.exports = router;
+
