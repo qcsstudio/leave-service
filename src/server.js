@@ -38,7 +38,7 @@ const connectDB = require("./config/db");
 require("./modules/workers/holiday.worker");
 
 // :white_check_mark: LAN Poller (old method)
-const lanPoller = require("./modules/biometric/lanPoller.service");
+// const lanPoller = require("./modules/biometric/lanPoller.service");
 
 const PORT = process.env.PORT || 5003;
 
@@ -58,11 +58,11 @@ const startServer = async () => {
       console.log("====================================");
 
       // :fire: Start LAN Polling (only works if device supports TCP/IP)
-      setInterval(() => {
-    lanPoller.pollDevices().catch(err => {
-      console.error(":x: Poller Crash:", err.message);
-    });
-  }, 30000);// every 15 sec
+//       setInterval(() => {
+//     lanPoller.pollDevices().catch(err => {
+//       console.error(":x: Poller Crash:", err.message);
+//     });
+//   }, 30000);// every 15 sec
     });
 
   } catch (error) {
