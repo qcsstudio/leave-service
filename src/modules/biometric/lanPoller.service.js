@@ -106,7 +106,7 @@ async function pollDevices() {
     for (const dev of devices) {
 
       // :dart: ONLY YOUR DEVICE (IMPORTANT)
-      if (dev.ipAddress !== "192.168.1.201") {
+      if (dev.ipAddress !== "192.168.1.19") {
         console.log(`:black_right_pointing_double_triangle_with_vertical_bar: Skipping: ${dev.name}`);
         continue;
       }
