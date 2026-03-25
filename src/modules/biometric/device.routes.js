@@ -13,5 +13,7 @@ router.delete("/device/:id", auth, deviceController.removeDevice);
 
 // Machine webhook (ADMS push)
 router.post("/event", eventController.receiveEvent);
-
+// ./modules/biometric/device.routes.js
+router.post("/event", eventController.receiveEvent); // keep this
+router.post("/biometric/event", eventController.receiveEvent); // optional duplicate
 module.exports = router;

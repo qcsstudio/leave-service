@@ -6,12 +6,11 @@ const attendanceService = require("../attendance/attendance.service");
 exports.receiveEvent = async (req, res) => {
   try {
     const apiKey = req.headers["x-device-key"]; // optional if device uses key
-    const device = await deviceService.findByApiKey(apiKey);
-
-    if (!device) {
-      console.log("❌ Invalid device API key:", apiKey);
-      return res.status(403).json({ message: "Invalid device" });
-    }
+console.log("📥 Incoming biometric hit");
+console.log("Headers:", req.headers);
+console.log("Body:", req.body);
+  // TEMP bypass
+const device = await Device.findOne({ isActive: true });
 
     // ADMS payload example: { deviceUserId: '123', timestamp: '2026-03-24T10:15:00' }
     const { deviceUserId, timestamp, deviceId } = req.body;
