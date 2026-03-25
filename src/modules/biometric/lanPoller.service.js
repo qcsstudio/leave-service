@@ -1,97 +1,127 @@
-const Device = require("./device.model");
-const processor = require("./event.processor");
-const ZKLib = require("node-zklib");
-const BiometricEvent = require("./biometricEvent.model");
+
+
+
+
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
+const ZKLib = require('node-zklib');
+const DeviceModel = require("./device.model");
 
 const DEFAULT_PORT = 4370;
 
-async function fetchLogsFromDevice(device) {
-  let zk;
-
-  try {
-    const port = DEFAULT_PORT; // 🔥 force 4370
-
-    console.log("====================================");
-    console.log("📡 Trying to connect device");
-    console.log("Device Name:", device.name);
-    console.log("Device IP:", device.ipAddress);
-    console.log("Device Port (forced):", port);
-    console.log("====================================");
-
-    zk = new ZKLib(device.ipAddress, port, 10000, 4000);
-
-    await zk.createSocket();
-
-    console.log("✅ Connected to device");
-
-    const logs = await zk.getAttendances();
-
-    const data = logs?.data || [];
-
-    console.log("📥 Raw logs:", data.length);
-
-    return data.map(log => ({
-      employeeCode: log.deviceUserId,
-      timestamp: log.recordTime
-    }));
-
-  } catch (error) {
-    console.error("❌ Device connection failed:", error.message);
-    return [];
-  } finally {
-    if (zk) {
-      try {
-        await zk.disconnect();
-        console.log("🔌 Disconnected");
-      } catch (e) {
-        console.log("⚠️ Disconnect error ignored");
-      }
-    }
-  }
+// :mag: Ping check
+async function isReachableByPing(ip) {
+  try {
+    await exec(`ping -c 1 -W 1 ${ip}`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-exports.pollDevices = async () => {
-  console.log("🚀 Poller started at:", new Date());
+// :repeat: Retry connection
+async function connectWithRetries(ip, port, attempts = 3, timeout = 10000) {
+  let lastErr;
 
-  const devices = await Device.find({
-    connectionMode: { $in: ["LAN", "LAN/IP"] },
-    isActive: true
-  });
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const zk = new ZKLib(ip, port, timeout, 4000);
+      await zk.createSocket();
+      return zk;
+    } catch (err) {
+      lastErr = err;
+      const delay = 1000 * (i + 1);
+      console.log(`:repeat: Retry ${i + 1} in ${delay}ms`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
 
-  console.log("📡 Total devices:", devices.length);
+  throw lastErr;
+}
 
-  for (const device of devices) {
-    console.log("📡 Polling device:", device.name, device.ipAddress);
+// :inbox_tray: Fetch logs
+async function fetchLogsFromDevice(device) {
+  let zk;
+  const port = device.port || DEFAULT_PORT;
 
-    try {
-      const logs = await fetchLogsFromDevice(device);
+  // :white_check_mark: FIX: handle all IP formats
+  const ip = device.ipAddress || device.ip || device.ip_address;
 
-      console.log("📥 Logs fetched count:", logs.length);
+  console.log(":receipt: Device Data:", device);
 
-      for (const log of logs) {
-        console.log("👉 Processing log:", log);
+  // :x: Prevent crash
+  if (!ip) {
+    console.error(":x: Missing IP for device:", device.name);
+    return [];
+  }
 
-        const exists = await BiometricEvent.findOne({
-          deviceId: device._id,
-          employeeCode: log.employeeCode,
-          timestamp: log.timestamp
-        });
+  console.log(`:satellite_antenna: Connecting to ${device.name} (${ip})`);
 
-        if (exists) {
-          console.log("⚠️ Duplicate skipped:", log);
-          continue;
-        }
+  try {
+    const reachable = await isReachableByPing(ip);
 
-        await processor.processEvent({
-          device,
-          employeeCode: log.employeeCode,
-          timestamp: log.timestamp,
-          rawPayload: log
-        });
-      }
+    if (!reachable) {
+      console.warn(":warning: Device not reachable, trying anyway...");
+    }
 
-    } catch (err) {
-      console.error("❌ Polling failed:", err.message);
-    }
-  }
+    zk = await connectWithRetries(ip, port);
+
+    console.log(":white_check_mark: Connected");
+
+    const logs = await zk.getAttendances();
+    const data = logs?.data || [];
+
+    console.log(`:inbox_tray: Logs received: ${data.length}`);
+
+    return data.map(log => ({
+      employeeCode: log.deviceUserId,
+      timestamp: log.recordTime
+    }));
+
+  } catch (err) {
+    console.error(`:x: Error (${ip}):`, err);
+    return [];
+  } finally {
+    if (zk) {
+      try {
+        await zk.disconnect();
+        console.log(":electric_plug: Disconnected");
+      } catch {}
+    }
+  }
+}
+
+// :fire: MAIN POLLER
+async function pollDevices() {
+  console.log(":arrows_counterclockwise: Checking biometric devices...");
+
+  try {
+    const devices = await DeviceModel.find();
+
+    if (!devices || devices.length === 0) {
+      console.log(":warning: No devices found in DB");
+      return;
+    }
+
+    for (const dev of devices) {
+
+      // :dart: ONLY YOUR DEVICE (IMPORTANT)
+      if (dev.ipAddress !== "192.168.1.201") {
+        console.log(`:black_right_pointing_double_triangle_with_vertical_bar: Skipping: ${dev.name}`);
+        continue;
+      }
+
+      const logs = await fetchLogsFromDevice(dev);
+
+      console.log(`:white_check_mark: ${dev.name}: ${logs.length} logs`);
+    }
+
+  } catch (err) {
+    console.error(":x: Poller Error:", err.message);
+  }
+}
+
+// :white_check_mark: EXPORT
+module.exports = {
+  pollDevices
 };
